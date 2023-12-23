@@ -2,19 +2,20 @@
 import os
 import math
 import time
+import threading
 from typing import SupportsFloat
 
 from cereal import car, log
 from openpilot.common.numpy_fast import clip, interp
 from openpilot.common.realtime import config_realtime_process, Priority, Ratekeeper, DT_CTRL
 from openpilot.common.profiler import Profiler
-from openpilot.common.params import Params, put_nonblocking, put_bool_nonblocking
+from openpilot.common.params import Params
 import cereal.messaging as messaging
 from cereal.visionipc import VisionIpcClient, VisionStreamType
 from openpilot.common.conversions import Conversions as CV
 from panda import ALTERNATIVE_EXPERIENCE
-from openpilot.system.swaglog import cloudlog
-from openpilot.system.version import is_release_branch, get_short_branch
+from openpilot.common.swaglog import cloudlog
+from openpilot.system.version import get_short_branch
 from openpilot.selfdrive.boardd.boardd import can_list_to_can_capnp
 from openpilot.selfdrive.car.car_helpers import get_car, get_startup_event, get_one_can
 from openpilot.selfdrive.controls.lib.lateral_planner import CAMERA_OFFSET, CAMERA_OFFSET_A
@@ -72,25 +73,23 @@ class Controls:
 
     # Setup sockets
     self.pm = messaging.PubMaster(['sendcan', 'controlsState', 'carState',
-                                   'carControl', 'carEvents', 'carParams'])
+                                   'carControl', 'onroadEvents', 'carParams'])
 
     self.sensor_packets = ["accelerometer", "gyroscope"]
     self.camera_packets = ["roadCameraState", "driverCameraState", "wideRoadCameraState"]
 
-    can_timeout = None if os.environ.get('NO_CAN_TIMEOUT', False) else 20
-    self.can_sock = messaging.sub_sock('can', timeout=can_timeout)
-
     self.log_sock = messaging.sub_sock('androidLog')
+    self.can_sock = messaging.sub_sock('can', timeout=20)
 
     self.params = Params()
-    ignore = self.sensor_packets + ['testJoystick']
+    ignore = self.sensor_packets + ['testJoystick', 'liveENaviData', 'liveMapData']
     if SIMULATION:
       ignore += ['driverCameraState', 'managerState']
     self.sm = messaging.SubMaster(['deviceState', 'pandaStates', 'peripheralState', 'modelV2', 'liveCalibration',
                                    'driverMonitoringState', 'longitudinalPlan', 'lateralPlan', 'liveLocationKalman',
                                    'managerState', 'liveParameters', 'radarState', 'liveTorqueParameters',
                                    'testJoystick', 'liveENaviData', 'liveMapData'] + self.camera_packets + self.sensor_packets,
-                                  ignore_alive=ignore, ignore_avg_freq=['radarState', 'testJoystick', 'liveENaviData', 'liveMapData'])
+                                  ignore_alive=ignore, ignore_avg_freq=['radarState', 'testJoystick', 'liveENaviData', 'liveMapData'], ignore_valid=['testJoystick', 'liveENaviData', 'liveMapData'])
 
     if CI is None:
       # wait for one pandaState and one CAN packet
@@ -103,7 +102,7 @@ class Controls:
     else:
       self.CI, self.CP = CI, CI.CP
 
-    self.joystick_mode = self.params.get_bool("JoystickDebugMode") or self.CP.notCar
+    self.joystick_mode = self.params.get_bool("JoystickDebugMode")
 
     # set alternative experiences from parameters
     self.disengage_on_accelerator = self.params.get_bool("DisengageOnAccelerator")
@@ -138,8 +137,8 @@ class Controls:
     car_recognized = self.CP.carName != 'mock'
 
     controller_available = self.CI.CC is not None and not passive and not self.CP.dashcamOnly
-    self.read_only = not car_recognized or not controller_available or self.CP.dashcamOnly
-    if self.read_only:
+    self.CP.passive = not car_recognized or not controller_available or self.CP.dashcamOnly
+    if self.CP.passive:
       safety_config = car.CarParams.SafetyConfig.new_message()
       safety_config.safetyModel = car.CarParams.SafetyModel.noOutput
       self.CP.safetyConfigs = [safety_config]
@@ -152,11 +151,11 @@ class Controls:
     # Write CarParams for radard
     cp_bytes = self.CP.to_bytes()
     self.params.put("CarParams", cp_bytes)
-    put_nonblocking("CarParamsCache", cp_bytes)
-    put_nonblocking("CarParamsPersistent", cp_bytes)
+    self.params.put_nonblocking("CarParamsCache", cp_bytes)
+    self.params.put_nonblocking("CarParamsPersistent", cp_bytes)
 
     # cleanup old params
-    if not self.CP.experimentalLongitudinalAvailable or is_release_branch():
+    if not self.CP.experimentalLongitudinalAvailable:
       self.params.remove("ExperimentalLongitudinalEnabled")
     if not self.CP.openpilotLongitudinalControl:
       self.params.remove("ExperimentalMode")
@@ -215,8 +214,6 @@ class Controls:
     self.v_cruise_helper = VCruiseHelper(self.CP)
     self.recalibrating_seen = False
 
-    # TODO: no longer necessary, aside from process replay
-    self.sm['liveParameters'].valid = True
     self.can_log_mono_time = 0
 
     self.startup_event = get_startup_event(car_recognized, controller_available, len(self.CP.carFw) > 0)
@@ -229,11 +226,8 @@ class Controls:
         set_offroad_alert("Offroad_CarUnrecognized", True)
       else:
         set_offroad_alert("Offroad_NoFirmware", True)
-    elif self.read_only:
+    elif self.CP.passive:
       self.events.add(EventName.dashcamMode, static=True)
-    elif self.joystick_mode:
-      self.events.add(EventName.joystickDebug, static=True)
-      self.startup_event = None
 
     # controlsd is driven by can recv, expected at 100Hz
     self.rk = Ratekeeper(100, print_delay_threshold=None)
@@ -313,9 +307,14 @@ class Controls:
         self.state = State.enabled
 
   def update_events(self, CS):
-    """Compute carEvents from carState"""
+    """Compute onroadEvents from carState"""
 
     self.events.clear()
+
+    # Add joystick event, static on cars, dynamic on nonCars
+    if self.joystick_mode:
+      self.events.add(EventName.joystickDebug)
+      self.startup_event = None
 
     # Add startup event
     if self.startup_event is not None:
@@ -328,7 +327,7 @@ class Controls:
       return
 
     # no more events while in dashcam mode
-    if self.read_only:
+    if self.CP.passive:
       return
 
     # Block resume if cruise never previously enabled
@@ -514,16 +513,17 @@ class Controls:
     else:
       self.logged_comm_issue = None
 
-    if not self.sm['lateralPlan'].mpcSolutionValid:
-      self.events.add(EventName.plannerError)
-    if not self.sm['liveLocationKalman'].posenetOK:
-      self.events.add(EventName.posenetInvalid)
-    if not self.sm['liveLocationKalman'].deviceStable:
-      self.events.add(EventName.deviceFalling)
-    if not self.sm['liveLocationKalman'].inputsOK:
-      self.events.add(EventName.locationdTemporaryError)
-    if not self.sm['liveParameters'].valid and not TESTING_CLOSET and (not SIMULATION or REPLAY):
-      self.events.add(EventName.paramsdTemporaryError)
+    if not (self.CP.notCar and self.joystick_mode):
+      if not self.sm['lateralPlan'].mpcSolutionValid:
+        self.events.add(EventName.plannerError)
+      if not self.sm['liveLocationKalman'].posenetOK:
+        self.events.add(EventName.posenetInvalid)
+      if not self.sm['liveLocationKalman'].deviceStable:
+        self.events.add(EventName.deviceFalling)
+      if not self.sm['liveLocationKalman'].inputsOK:
+        self.events.add(EventName.locationdTemporaryError)
+      if not self.sm['liveParameters'].valid and not TESTING_CLOSET and (not SIMULATION or REPLAY):
+        self.events.add(EventName.paramsdTemporaryError)
 
     # conservative HW alert. if the data or frequency are off, locationd will throw an error
     if any((self.sm.frame - self.sm.rcv_frame[s])*DT_CTRL > 10. for s in self.sensor_packets):
@@ -589,12 +589,12 @@ class Controls:
         if VisionStreamType.VISION_STREAM_WIDE_ROAD not in available_streams:
           self.sm.ignore_alive.append('wideRoadCameraState')
 
-        if not self.read_only:
+        if not self.CP.passive:
           self.CI.init(self.CP, self.can_sock, self.pm.sock['sendcan'])
 
         self.initialized = True
         self.set_initial_state()
-        put_bool_nonblocking("ControlsReady", True)
+        self.params.put_bool_nonblocking("ControlsReady", True)
 
     # Check for CAN timeout
     if not can_strs:
@@ -774,7 +774,7 @@ class Controls:
                                                                                        lat_plan.curvatures,
                                                                                        lat_plan.curvatureRates)
       actuators.steer, actuators.steeringAngleDeg, lac_log = self.LaC.update(CC.latActive, CS, self.VM, lp,
-                                                                             self.last_actuators, self.steer_limited, self.desired_curvature,
+                                                                             self.steer_limited, self.desired_curvature,
                                                                              self.desired_curvature_rate, self.sm['liveLocationKalman'])
       actuators.curvature = self.desired_curvature
       self.desired_angle_deg = actuators.steeringAngleDeg
@@ -794,7 +794,7 @@ class Controls:
         if CC.latActive:
           steer = clip(joystick_axes[1], -1, 1)
           # max angle is 45 for angle-based cars, max curvature is 0.02
-          actuators.steer, actuators.steeringAngleDeg, actuators.curvature = steer, steer * 45., steer * -0.02
+          actuators.steer, actuators.steeringAngleDeg, actuators.curvature = steer, steer * 90., steer * -0.02
           self.desired_angle_deg = actuators.steeringAngleDeg
 
         lac_log.active = self.active
@@ -954,11 +954,11 @@ class Controls:
         CC.actuatorsOutput = self.last_actuators
         if self.CP.steerControlType == car.CarParams.SteerControlType.angle:
           self.steer_limited = abs(CC.actuators.steeringAngleDeg - CC.actuatorsOutput.steeringAngleDeg) > \
-                              STEER_ANGLE_SATURATION_THRESHOLD
+                               STEER_ANGLE_SATURATION_THRESHOLD
         else:
           self.steer_limited = abs(CC.actuators.steer - CC.actuatorsOutput.steer) > 1e-2
     else:
-      if not self.read_only and self.initialized:
+      if not self.CP.passive and self.initialized:
         # send car controls over can
         now_nanos = self.can_log_mono_time if REPLAY else int(time.monotonic() * 1e9)
         if self.CP.carName == "hyundai":
@@ -969,7 +969,7 @@ class Controls:
         CC.actuatorsOutput = self.last_actuators
         if self.CP.steerControlType == car.CarParams.SteerControlType.angle:
           self.steer_limited = abs(CC.actuators.steeringAngleDeg - CC.actuatorsOutput.steeringAngleDeg) > \
-                              STEER_ANGLE_SATURATION_THRESHOLD
+                               STEER_ANGLE_SATURATION_THRESHOLD
         else:
           self.steer_limited = abs(CC.actuators.steer - CC.actuatorsOutput.steer) > 1e-2
 
@@ -1086,16 +1086,18 @@ class Controls:
     cs_send.carState.events = car_events
     self.pm.send('carState', cs_send)
 
-    # carEvents - logged every second or on change
+    # onroadEvents - logged every second or on change
     if (self.sm.frame % int(1. / DT_CTRL) == 0) or (self.events.names != self.events_prev):
-      ce_send = messaging.new_message('carEvents', len(self.events))
-      ce_send.carEvents = car_events
-      self.pm.send('carEvents', ce_send)
+      ce_send = messaging.new_message('onroadEvents', len(self.events))
+      ce_send.valid = True
+      ce_send.onroadEvents = car_events
+      self.pm.send('onroadEvents', ce_send)
     self.events_prev = self.events.names.copy()
 
     # carParams - logged every 50 seconds (> 1 per segment)
     if (self.sm.frame % int(50. / DT_CTRL) == 0):
       cp_send = messaging.new_message('carParams')
+      cp_send.valid = True
       cp_send.carParams = self.CP
       self.pm.send('carParams', cp_send)
 
@@ -1112,9 +1114,6 @@ class Controls:
     start_time = time.monotonic()
     self.prof.checkpoint("Ratekeeper", ignore=True)
 
-    self.is_metric = self.params.get_bool("IsMetric")
-    self.experimental_mode = self.params.get_bool("ExperimentalMode") and self.CP.openpilotLongitudinalControl
-
     # Sample data from sockets and get a carState
     CS = self.data_sample()
     cloudlog.timestamp("Data sampled")
@@ -1123,7 +1122,7 @@ class Controls:
     self.update_events(CS)
     cloudlog.timestamp("Events updated")
 
-    if not self.read_only and self.initialized:
+    if not self.CP.passive and self.initialized:
       # Update control state
       self.state_transition(CS)
       self.prof.checkpoint("State transition")
@@ -1139,11 +1138,26 @@ class Controls:
 
     self.CS_prev = CS
 
+  def params_thread(self, evt):
+    while not evt.is_set():
+      self.is_metric = self.params.get_bool("IsMetric")
+      self.experimental_mode = self.params.get_bool("ExperimentalMode") and self.CP.openpilotLongitudinalControl
+      if self.CP.notCar:
+        self.joystick_mode = self.params.get_bool("JoystickDebugMode")
+      time.sleep(0.1)
+
   def controlsd_thread(self):
-    while True:
-      self.step()
-      self.rk.monitor_time()
-      self.prof.display()
+    e = threading.Event()
+    t = threading.Thread(target=self.params_thread, args=(e, ))
+    try:
+      t.start()
+      while True:
+        self.step()
+        self.rk.monitor_time()
+        self.prof.display()
+    except SystemExit:
+      e.set()
+      t.join()
 
 
 def main():

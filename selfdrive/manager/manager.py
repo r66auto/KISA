@@ -19,7 +19,7 @@ from openpilot.selfdrive.manager.helpers import unblock_stdout, write_onroad_par
 from openpilot.selfdrive.manager.process import ensure_running
 from openpilot.selfdrive.manager.process_config import managed_processes
 from openpilot.selfdrive.athena.registration import register, UNREGISTERED_DONGLE_ID
-from openpilot.system.swaglog import cloudlog, add_file_handler
+from openpilot.common.swaglog import cloudlog, add_file_handler
 from openpilot.system.version import is_dirty, get_commit, get_version, get_origin, get_short_branch, \
                            get_normalized_origin, terms_version, training_version, \
                            is_tested_branch, is_release_branch
@@ -140,7 +140,7 @@ def manager_init() -> None:
     ("AutoResCondition", "0"),
     ("KisaMonitoringMode", "0"),
     ("KisaMonitorEyesThreshold", "45"),
-    ("KisaMonitorBlinkThreshold", "35"),
+    ("KisaMonitorBlinkThreshold", "75"),
     ("UFCModeEnabled", "0"),
     ("SteerWarningFix", "0"),
     ("CruiseGap1", "11"),
@@ -245,6 +245,7 @@ def manager_init() -> None:
     ("CruiseSpammingLevel", "15,10,5,0"),
     ("KisaCruiseGapSet", "4"),
     ("UseLegacyLaneModel", "0"),
+    ("DrivingModel", "DrivingModel"),
   ]
   if not PC:
     default_params.append(("LastUpdateTime", datetime.datetime.utcnow().isoformat().encode('utf8')))
@@ -371,7 +372,7 @@ def manager_thread() -> None:
     cloudlog.debug(running)
 
     # send managerState
-    msg = messaging.new_message('managerState')
+    msg = messaging.new_message('managerState', valid=True)
     msg.managerState.processes = [p.get_process_state_msg() for p in managed_processes.values()]
     pm.send('managerState', msg)
 

@@ -268,6 +268,8 @@ typedef struct UIScene {
   int satelliteCount;
   float gpsAccuracy;
 
+  QString model_name;
+
   cereal::DeviceState::Reader deviceState;
   cereal::PeripheralState::Reader peripheralState;
   cereal::CarState::Reader car_state;
@@ -335,6 +337,7 @@ typedef struct UIScene {
     int ewazenavsign;
     int ewazenavdistance;
     std::string ewazealerttype;
+    bool ewazealertextend;
   } liveENaviData;
 
   struct _LiveMapData
@@ -384,6 +387,7 @@ typedef struct UIScene {
 
   float light_sensor;
   bool started, ignition, is_metric, map_on_left, longitudinal_control;
+  bool world_objects_visible = false;
   uint64_t started_frame;
 } UIScene;
 
@@ -393,9 +397,6 @@ class UIState : public QObject {
 public:
   UIState(QObject* parent = 0);
   void updateStatus();
-  inline bool worldObjectsVisible() const {
-    return sm->rcv_frame("liveCalibration") > scene.started_frame;
-  }
   inline bool engaged() const {
     return scene.started && (*sm)["controlsState"].getControlsState().getEnabled();
   }

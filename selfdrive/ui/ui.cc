@@ -326,6 +326,22 @@ static void update_state(UIState *s) {
     scene.light_sensor = std::max(100.0f - scale * cam_state.getExposureValPercent(), 0.0f);
   }
 
+  if (s->sm->frame % (8*UI_FREQ) == 0) {
+  	s->is_OpenpilotViewEnabled = Params().getBool("IsOpenpilotViewEnabled");
+  }
+
+  if (!s->is_OpenpilotViewEnabled) {
+    scene.started = sm["deviceState"].getDeviceState().getStarted() && scene.ignition;
+  } else {
+    scene.started = sm["deviceState"].getDeviceState().getStarted();
+  }
+
+  scene.world_objects_visible = scene.world_objects_visible ||
+                                (scene.started &&
+                                 sm.rcv_frame("liveCalibration") > scene.started_frame &&
+                                 sm.rcv_frame("modelV2") > scene.started_frame &&
+                                 sm.rcv_frame("uiPlan") > scene.started_frame);
+
   if (sm.updated("lateralPlan")) {
     scene.lateral_plan = sm["lateralPlan"].getLateralPlan();
     auto lp_data = sm["lateralPlan"].getLateralPlan();
@@ -391,6 +407,7 @@ static void update_state(UIState *s) {
       scene.liveENaviData.ewazenavsign = lme_data.getWazeNavSign();
       scene.liveENaviData.ewazenavdistance = lme_data.getWazeNavDistance();
       scene.liveENaviData.ewazealerttype = lme_data.getWazeAlertType();
+      scene.liveENaviData.ewazealertextend = lme_data.getWazeAlertExtend();
     }
   }
   if (sm.updated("liveMapData")) {
@@ -404,16 +421,6 @@ static void update_state(UIState *s) {
     scene.liveMapData.oturnSpeedLimitSign = lmap_data.getTurnSpeedLimitSign();
     scene.liveMapData.ocurrentRoadName = lmap_data.getCurrentRoadName();
     scene.liveMapData.oref = lmap_data.getRef();
-  }
-
-  if (s->sm->frame % (8*UI_FREQ) == 0) {
-  	s->is_OpenpilotViewEnabled = Params().getBool("IsOpenpilotViewEnabled");
-  }
-
-  if (!s->is_OpenpilotViewEnabled) {
-    scene.started = sm["deviceState"].getDeviceState().getStarted() && scene.ignition;
-  } else {
-    scene.started = sm["deviceState"].getDeviceState().getStarted();
   }
 }
 
@@ -445,6 +452,7 @@ void UIState::updateStatus() {
       scene.started_frame = sm->frame;
     }
     started_prev = scene.started;
+    scene.world_objects_visible = false;
     emit offroadTransition(!scene.started);
   }
 
@@ -512,6 +520,7 @@ void UIState::updateStatus() {
     scene.stock_lkas_on_disengagement = params.getBool("StockLKASEnabled");
     scene.ufc_mode = params.getBool("UFCModeEnabled");
     scene.op_long_enabled = params.getBool("ExperimentalLongitudinalEnabled");
+    scene.model_name = QString::fromStdString(params.get("DrivingModel"));
 
     if (scene.autoScreenOff > 0) {
       scene.nTime = scene.autoScreenOff * 60 * UI_FREQ;

@@ -4,7 +4,7 @@ import time
 import numpy as np
 from cereal import log
 from openpilot.common.numpy_fast import clip, interp
-from openpilot.system.swaglog import cloudlog
+from openpilot.common.swaglog import cloudlog
 # WARNING: imports outside of constants will not trigger a rebuild
 from openpilot.selfdrive.modeld.constants import index_function
 from openpilot.selfdrive.car.interfaces import ACCEL_MIN
@@ -40,7 +40,7 @@ X_EGO_COST = 0.
 V_EGO_COST = 0.
 A_EGO_COST = 0.
 J_EGO_COST = 5.0
-A_CHANGE_COST = 100. # 200.
+A_CHANGE_COST = 200.
 DANGER_ZONE_COST = 100.
 CRASH_DISTANCE = .25
 LEAD_DANGER_FACTOR = 0.75

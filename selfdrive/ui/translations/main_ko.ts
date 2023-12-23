@@ -287,34 +287,7 @@
     </message>
 </context>
 <context>
-    <name>DriveStats</name>
-    <message>
-        <source>Drives</source>
-        <translation>주행</translation>
-    </message>
-    <message>
-        <source>Hours</source>
-        <translation>시간</translation>
-    </message>
-    <message>
-        <source>ALL TIME</source>
-        <translation>전체</translation>
-    </message>
-    <message>
-        <source>PAST WEEK</source>
-        <translation>지난 주</translation>
-    </message>
-    <message>
-        <source>KM</source>
-        <translation>km</translation>
-    </message>
-    <message>
-        <source>Miles</source>
-        <translation>마일</translation>
-    </message>
-</context>
-<context>
-    <name>DriverViewScene</name>
+    <name>DriverViewWindow</name>
     <message>
         <source>camera starting</source>
         <translation>카메라 시작 중</translation>
@@ -980,8 +953,8 @@ This may take up to a minute.</source>
         <translation>Git 브랜치</translation>
     </message>
     <message>
-        <source>Git Commit</source>
-        <translation>Git 커밋</translation>
+        <source>Commit(Local/Remote)</source>
+        <translation>커밋(로컬/원격)</translation>
     </message>
     <message>
         <source>Fork</source>
@@ -1004,8 +977,8 @@ This may take up to a minute.</source>
         <translation>네트워크 연결이 끊겼거나 불안정합니다. 연결 상태를 확인하세요.</translation>
     </message>
     <message>
-        <source>Local and remote match, but running check, try again in few seconds to make sure.</source>
-        <translation>로컬과 원격 커밋이 일치합니다. 원격지에 업데이트가 있는지 확인중이며, 잠시 후 한번더 시도해 보세요.</translation>
+        <source>Checking update takes a time. If Same message, no update required.</source>
+        <translation>업데이트 확인에 시간이 걸립니다. 같은 메시지가 나오면 업데이트가 필요 없습니다.</translation>
     </message>
     <message>
         <source>Device will be updated and rebooted. Do you want to proceed?</source>
@@ -1676,6 +1649,33 @@ This may take up to a minute.</source>
     <message>
         <source>SET</source>
         <translation>설정</translation>
+    </message>
+</context>
+<context>
+    <name>ModelSelectCombo</name>
+    <message>
+        <source>Select Driving Model</source>
+        <translation>드라이빙 모델을 선택하세요</translation>
+    </message>
+    <message>
+        <source>Reset</source>
+        <translation>리셋</translation>
+    </message>
+    <message>
+        <source>Model</source>
+        <translation>모델</translation>
+    </message>
+    <message>
+        <source>Driving model will be changed. Downloading(50MB) takes a time. Will be reboot if done.</source>
+        <translation>드라이빙 모델을 변경합니다. 다운로드(50MB)에 시간이 걸립니다. 완료되면 재부팅 됩니다.</translation>
+    </message>
+    <message>
+        <source>Do you want to restore original model?</source>
+        <translation>원래의 모델로 바꾸시겠습니까?</translation>
+    </message>
+    <message>
+        <source>Original Model</source>
+        <translation>원래 모델</translation>
     </message>
 </context>
 <context>
@@ -3983,8 +3983,8 @@ This may take up to a minute.</source>
         <translation>외부장치IP</translation>
     </message>
     <message>
-        <source>Set Your External Device IP to get useful data.</source>
-        <translation>외부 장치 IP를 설정하여 장치로부터 유용한 데이터(네비 등)를 받아올수 있게 합니다.</translation>
+        <source>Set Your External Device IP to get useful data. ex. a ip:192.168.0.1 / two or more: 192.168.0.1,192.168.0.2 put comma btw IPs / range:192.168.0.1-10  192.168.0-10.254 use dash(-)</source>
+        <translation>외부 장치 IP를 설정하여 장치로부터 유용한 데이터(네비 등)를 받아올수 있게 합니다. 설정방법은 단수:192.168.0.1 / 여러개:192.168.0.1,192.168.0.2 IP사이에 콤마로 구분 / 범위:192.168.0.1-10 이런식으로 하이픈을 이용 192.168.0-10.1 이렇게도 가능</translation>
     </message>
     <message>
         <source>SET</source>
@@ -3995,8 +3995,8 @@ This may take up to a minute.</source>
         <translation>외부장치의 IP를 입력하세요</translation>
     </message>
     <message>
-        <source>Seperate with (,) for multiple IP</source>
-        <translation>여러개 IP 설정시 (,)로 구분하세요</translation>
+        <source>See description for more detail how to set up.</source>
+        <translation>IP입력 방법은 메뉴의 설명을 참고하세요.</translation>
     </message>
 </context>
 <context>

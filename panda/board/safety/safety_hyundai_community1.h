@@ -56,13 +56,13 @@ const CanMsg HYUNDAI_COMMUNITY1_CAMERA_SCC_TX_MSGS[] = {
 
 
 #define HYUNDAI_COMMUNITY1_RX_CHECKS(legacy)                                                                                              \
-  {.msg = {{0x260, 0, 8, .check_checksum = true, .max_counter = 3U, .expected_timestep = 10000U},                                       \
-           {0x371, 0, 8, .expected_timestep = 10000U}, { 0 }}},                                                                         \
-  {.msg = {{0x386, 0, 8, .check_checksum = !(legacy), .max_counter = (legacy) ? 0U : 15U, .expected_timestep = 10000U}, { 0 }, { 0 }}}, \
-  {.msg = {{0x394, 0, 8, .check_checksum = !(legacy), .max_counter = (legacy) ? 0U : 7U, .expected_timestep = 10000U}, { 0 }, { 0 }}},  \
+  {.msg = {{0x260, 0, 8, .check_checksum = true, .max_counter = 3U, .frequency = 100U},                                       \
+           {0x371, 0, 8, .frequency = 100U}, { 0 }}},                                                                         \
+  {.msg = {{0x386, 0, 8, .check_checksum = !(legacy), .max_counter = (legacy) ? 0U : 15U, .frequency = 100U}, { 0 }, { 0 }}}, \
+  {.msg = {{0x394, 0, 8, .check_checksum = !(legacy), .max_counter = (legacy) ? 0U : 7U, .frequency = 100U}, { 0 }, { 0 }}},  \
 
 #define HYUNDAI_COMMUNITY1_SCC12_ADDR_CHECK(scc_bus)                                                                                  \
-  {.msg = {{0x421, (scc_bus), 8, .check_checksum = true, .max_counter = 15U, .expected_timestep = 20000U}, { 0 }, { 0 }}}, \
+  {.msg = {{0x421, (scc_bus), 8, .check_checksum = true, .max_counter = 15U, .frequency = 50U}, { 0 }, { 0 }}}, \
 
 RxCheck hyundai_community1_rx_checks[] = {
    HYUNDAI_COMMUNITY1_RX_CHECKS(false)
@@ -77,14 +77,14 @@ RxCheck hyundai_community1_cam_scc_rx_checks[] = {
 RxCheck hyundai_community1_long_rx_checks[] = {
   HYUNDAI_COMMUNITY1_RX_CHECKS(false)
   // Use CLU11 (buttons) to manage controls allowed instead of SCC cruise state
-  {.msg = {{0x4F1, 0, 4, .check_checksum = false, .max_counter = 15U, .expected_timestep = 20000U}, { 0 }, { 0 }}},
+  {.msg = {{0x4F1, 0, 4, .check_checksum = false, .max_counter = 15U, .frequency = 50U}, { 0 }, { 0 }}},
 };
 
 // older hyundai models have less checks due to missing counters and checksums
 RxCheck hyundai_community1_legacy_rx_checks[] = {
-  {.msg = {{0x260, 0, 8, .check_checksum = true, .max_counter = 3U, .expected_timestep = 10000U},
-           {0x371, 0, 8, .expected_timestep = 10000U}, { 0 }}},
-  {.msg = {{0x386, 0, 8, .expected_timestep = 20000U}, { 0 }, { 0 }}},
+  {.msg = {{0x260, 0, 8, .check_checksum = true, .max_counter = 3U, .frequency = 100U},
+           {0x371, 0, 8, .frequency = 100U}, { 0 }}},
+  {.msg = {{0x386, 0, 8, .frequency = 50U}, { 0 }, { 0 }}},
 };
 
 bool hyundai_community1_legacy = false;
@@ -159,7 +159,7 @@ uint32_t last_ts_mdps12_from_op = 0;
 uint32_t last_ts_fca11_from_op = 0;
 
 static bool hyundai_community1_tx_hook(CANPacket_t *to_send) {
-  int tx = 1;
+  bool tx = true;
   int addr = GET_ADDR(to_send);
 
   // FCA11: Block any potential actuation
@@ -169,7 +169,7 @@ static bool hyundai_community1_tx_hook(CANPacket_t *to_send) {
     int CF_VSM_DecCmdAct = GET_BIT(to_send, 31U);
 
     if ((CR_VSM_DecCmd != 0) || (FCA_CmdAct != 0) || (CF_VSM_DecCmdAct != 0)) {
-      tx = 0;
+      tx = false;
     }
   }
 
@@ -189,7 +189,7 @@ static bool hyundai_community1_tx_hook(CANPacket_t *to_send) {
     //violation |= (aeb_req != 0);
 
     if (violation) {
-      tx = 0;
+      tx = false;
     }
   }
 
@@ -197,7 +197,7 @@ static bool hyundai_community1_tx_hook(CANPacket_t *to_send) {
   if (addr == 0x340) {
     int desired_torque = ((GET_BYTES(to_send, 0, 4) >> 16) & 0x7ffU) - 1024U;
     uint32_t ts = microsecond_timer_get();
-    bool violation = 0;
+    bool violation = false;
 
     if (controls_allowed) {
 
@@ -228,7 +228,7 @@ static bool hyundai_community1_tx_hook(CANPacket_t *to_send) {
 
     // no torque if controls is not allowed
     if (!controls_allowed && (desired_torque != 0)) {
-      violation = 1;
+      violation = true;
     }
 
     // reset to 0 if either controls is not allowed or there's a violation
@@ -239,14 +239,14 @@ static bool hyundai_community1_tx_hook(CANPacket_t *to_send) {
     }
 
     if (violation) {
-      tx = 0;
+      tx = false;
     }
   }
 
   // UDS: Only tester present ("\x02\x3E\x80\x00\x00\x00\x00\x00") allowed on diagnostics address
   if (addr == 0x7D0) {
     if ((GET_BYTES(to_send, 0, 4) != 0x00803E02U) || (GET_BYTES(to_send, 4, 4) != 0x0U)) {
-      tx = 0;
+      tx = false;
     }
   }
 
@@ -258,18 +258,18 @@ static bool hyundai_community1_tx_hook(CANPacket_t *to_send) {
   //
   //  bool allowed_cancel = (button == 4) && cruise_engaged_prev;
   //  if (!(allowed_resume || allowed_cancel)) {
-  //    tx = 0;
+  //    tx = false;
   //  }
   //}
 
   if (addr == 0x340) {
-    last_ts_lkas11_from_op = (tx == 0 ? 0 : microsecond_timer_get());
+    last_ts_lkas11_from_op = (tx == false ? 0 : microsecond_timer_get());
   } else if (addr == 0x421) {
-    last_ts_scc12_from_op = (tx == 0 ? 0 : microsecond_timer_get());
+    last_ts_scc12_from_op = (tx == false ? 0 : microsecond_timer_get());
   } else if (addr == 0x251) {
-    last_ts_mdps12_from_op = (tx == 0 ? 0 : microsecond_timer_get());
+    last_ts_mdps12_from_op = (tx == false ? 0 : microsecond_timer_get());
   } else if (addr == 0x38D) {
-    last_ts_fca11_from_op = (tx == 0 ? 0 : microsecond_timer_get());
+    last_ts_fca11_from_op = (tx == false ? 0 : microsecond_timer_get());
   }
 
   return tx;
@@ -354,7 +354,6 @@ const safety_hooks hyundai_community1_hooks = {
   .init = hyundai_community1_init,
   .rx = hyundai_community1_rx_hook,
   .tx = hyundai_community1_tx_hook,
-  .tx_lin = nooutput_tx_lin_hook,
   .fwd = hyundai_community1_fwd_hook,
 };
 
@@ -362,6 +361,5 @@ const safety_hooks hyundai_community1_legacy_hooks = {
   .init = hyundai_community1_legacy_init,
   .rx = hyundai_community1_rx_hook,
   .tx = hyundai_community1_tx_hook,
-  .tx_lin = nooutput_tx_lin_hook,
   .fwd = hyundai_community1_fwd_hook,
 };

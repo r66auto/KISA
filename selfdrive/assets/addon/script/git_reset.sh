@@ -18,6 +18,11 @@ if [ "$?" == "0" ]; then
   git reset --hard origin/$CURRENT_BRANCH
   git pull origin $CURRENT_BRANCH
 
+  rm -f /data/params/d/DrivingModel
+  rm -f /data/openpilot/selfdrive/modeld/models/supercombo.onnx
+  rm -f /data/openpilot/selfdrive/modeld/models/supercombo.thneed
+  rm -f /data/openpilot/selfdrive/modeld/models/supercombo_metadata.pkl
+  git -C /data/openpilot/selfdrive//modeld/models checkout supercombo.onnx
   touch /data/kisa_compiling
   sleep 1
 

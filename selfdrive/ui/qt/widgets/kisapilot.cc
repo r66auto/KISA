@@ -606,6 +606,86 @@ void CarSelectCombo::refresh() {
   }
 }
 
+ModelSelectCombo::ModelSelectCombo() : AbstractControl("", "", "") 
+{
+  QStringList stringList;
+  QFile modellistfile("/data/openpilot/selfdrive/assets/addon/model/ModelList");
+  if (modellistfile.open(QIODevice::ReadOnly)) {
+    QTextStream modelname(&modellistfile);
+    while (!modelname.atEnd()) {
+      QString line = modelname.readLine();
+      stringList.append(line);
+    }
+    modellistfile.close();
+  }
+
+  hlayout->addStretch(1);
+
+  label.setAlignment(Qt::AlignVCenter|Qt::AlignLeft);
+  hlayout->addWidget(&label);
+
+  btn1.setStyleSheet(R"(
+    padding: 0;
+    border-radius: 0px;
+    font-size: 50px;
+    font-weight: 500;
+    color: #E4E4E4;
+    background-color: #393939;
+  )");
+
+  btn2.setStyleSheet(R"(
+    padding: 0;
+    border-radius: 50px;
+    font-size: 35px;
+    font-weight: 500;
+    color: #E4E4E4;
+    background-color: #393939;
+  )");
+
+  btn1.setFixedSize(1100, 100);
+  btn2.setFixedSize(200, 100);
+  hlayout->addWidget(&btn1);
+  hlayout->addWidget(&btn2);
+  btn1.setText(QString::fromStdString(params.get("DrivingModel")));
+  btn2.setText(tr("Reset"));
+  label.setText(tr("Model"));
+
+  QObject::connect(&btn1, &QPushButton::clicked, [=]() {
+    QString cur = QString::fromStdString(params.get("DrivingModel"));
+    selection = MultiOptionDialog::getSelection(tr("Select Driving Model"), stringList, cur, this);
+    if (!selection.isEmpty()) {
+      if (selection != cur) {
+        if (ConfirmationDialog::confirm2("<" + selection + "> " + tr("Driving model will be changed. Downloading(50MB) takes a time. Will be reboot if done."), this)) {
+          params.put("DrivingModel", selection.toStdString());
+          QProcess::execute("touch /data/kisa_compiling");
+          params.put("RunCustomCommand", "4", 1);
+        }
+      }
+    }
+    btn1.setText(QString::fromStdString(params.get("DrivingModel")));
+    refresh();
+  });
+
+  QObject::connect(&btn2, &QPushButton::clicked, [=]() {
+    if (ConfirmationDialog::confirm2(tr("Do you want to restore original model?"), this)) {
+      params.remove("DrivingModel");
+      QProcess::execute("touch /data/kisa_compiling");
+      params.put("RunCustomCommand", "5", 1);
+      refresh();
+    }
+  });
+  refresh();
+}
+
+void ModelSelectCombo::refresh() {
+  QString selected_modelname = QString::fromStdString(params.get("DrivingModel"));
+  if (selected_modelname.length()) {
+    btn1.setText(selected_modelname);
+  } else {
+    btn1.setText(tr("Original Model"));
+  }
+}
+
 BranchSelectCombo::BranchSelectCombo() : AbstractControl("", "", "") 
 {
   hlayout->addStretch(1);
@@ -947,9 +1027,9 @@ VolumeControl::VolumeControl() : AbstractControl(tr("Device Volume Control(%)"),
   QObject::connect(&btnminus, &QPushButton::clicked, [=]() {
     auto str = QString::fromStdString(params.get("KisaUIVolumeBoost"));
     int value = str.toInt();
-    value = value - 5;
-    if (value <= -5) {
-      value = -5;
+    value = value - 10;
+    if (value <= -10) {
+      value = -10;
     }
     QString values = QString::number(value);
     uiState()->scene.nVolumeBoost = value;
@@ -961,7 +1041,7 @@ VolumeControl::VolumeControl() : AbstractControl(tr("Device Volume Control(%)"),
   QObject::connect(&btnplus, &QPushButton::clicked, [=]() {
     auto str = QString::fromStdString(params.get("KisaUIVolumeBoost"));
     int value = str.toInt();
-    value = value + 5;
+    value = value + 10;
     if (value >= 100) {
       value = 100;
     }
@@ -978,7 +1058,7 @@ void VolumeControl::refresh() {
   QString option = QString::fromStdString(params.get("KisaUIVolumeBoost"));
   if (option == "0") {
     label.setText(tr("Default"));
-  } else if (option == "-5") {
+  } else if (option == "-10") {
     label.setText(tr("Mute"));
   } else {
     label.setText(QString::fromStdString(params.get("KisaUIVolumeBoost")));
@@ -5247,22 +5327,22 @@ LCTimingFactor::LCTimingFactor() : AbstractControl("", "", "") {
 
   hlayout->addWidget(&label1a);
   hlayout->addWidget(&label1);
-  btn1.setFixedSize(150, 100);
+  btn1.setFixedSize(145, 100);
   label1a.setText("30:");
   hlayout->addWidget(&btn1);
   hlayout->addWidget(&label2a);
   hlayout->addWidget(&label2);
-  btn2.setFixedSize(150, 100);
+  btn2.setFixedSize(145, 100);
   label2a.setText("60:");
   hlayout->addWidget(&btn2);
   hlayout->addWidget(&label3a);
   hlayout->addWidget(&label3);
-  btn3.setFixedSize(150, 100);
+  btn3.setFixedSize(145, 100);
   label3a.setText("80:");
   hlayout->addWidget(&btn3);
   hlayout->addWidget(&label4a);
   hlayout->addWidget(&label4);
-  btn4.setFixedSize(150, 100);
+  btn4.setFixedSize(145, 100);
   label4a.setText("110:");
   hlayout->addWidget(&btn4);
 
@@ -5564,6 +5644,8 @@ VCurvSpeed::VCurvSpeed() : AbstractControl("", "", "") {
     height: 120px;
   )");
   btn.setFixedSize(150, 100);
+  edit1.setFixedSize(650, 100);
+  edit2.setFixedSize(650, 100);
   edit1.setAlignment(Qt::AlignVCenter|Qt::AlignLeft);
   edit2.setAlignment(Qt::AlignVCenter|Qt::AlignLeft);
 
@@ -5666,6 +5748,8 @@ OCurvSpeed::OCurvSpeed() : AbstractControl("", "", "") {
     height: 120px;
   )");
   btn.setFixedSize(150, 100);
+  edit1.setFixedSize(650, 100);
+  edit2.setFixedSize(650, 100);
   edit1.setAlignment(Qt::AlignVCenter|Qt::AlignLeft);
   edit2.setAlignment(Qt::AlignVCenter|Qt::AlignLeft);
 
@@ -6578,6 +6662,8 @@ OSMCustomSpeedLimit::OSMCustomSpeedLimit() : AbstractControl("", "", "") {
   btn.setFixedSize(150, 100);
   edit1.setAlignment(Qt::AlignVCenter|Qt::AlignLeft);
   edit2.setAlignment(Qt::AlignVCenter|Qt::AlignLeft);
+  edit1.setFixedSize(650, 100);
+  edit2.setFixedSize(650, 100);
 
   hlayout->addWidget(&edit1);
   hlayout->addWidget(&edit2);
@@ -6877,6 +6963,8 @@ SpeedLaneWidth::SpeedLaneWidth() : AbstractControl("", "", "") {
     height: 120px;
   )");
   btn.setFixedSize(150, 100);
+  edit1.setFixedSize(650, 100);
+  edit2.setFixedSize(650, 100);
   edit1.setAlignment(Qt::AlignVCenter|Qt::AlignLeft);
   edit2.setAlignment(Qt::AlignVCenter|Qt::AlignLeft);
 
@@ -7030,8 +7118,8 @@ KISAEdgeOffset::KISAEdgeOffset() : AbstractControl("", tr("low value to move car
     color: #E4E4E4;
     background-color: #393939;
   )");
-  btnminusl.setFixedSize(170, 100);
-  btnplusl.setFixedSize(170, 100);
+  btnminusl.setFixedSize(150, 100);
+  btnplusl.setFixedSize(150, 100);
   hlayout->addWidget(&btnminusl);
   hlayout->addWidget(&btnplusl);
 
@@ -7057,8 +7145,8 @@ KISAEdgeOffset::KISAEdgeOffset() : AbstractControl("", tr("low value to move car
     color: #E4E4E4;
     background-color: #393939;
   )");
-  btnminusr.setFixedSize(170, 100);
-  btnplusr.setFixedSize(170, 100);
+  btnminusr.setFixedSize(150, 100);
+  btnplusr.setFixedSize(150, 100);
   hlayout->addWidget(&btnminusr);
   hlayout->addWidget(&btnplusr);
 
@@ -7157,8 +7245,8 @@ ToAvoidLKASFault::ToAvoidLKASFault() : AbstractControl("", "", "") {
     color: #E4E4E4;
     background-color: #393939;
   )");
-  btnminusl.setFixedSize(170, 100);
-  btnplusl.setFixedSize(170, 100);
+  btnminusl.setFixedSize(150, 100);
+  btnplusl.setFixedSize(150, 100);
   hlayout->addWidget(&btnminusl);
   hlayout->addWidget(&btnplusl);
 
@@ -7184,8 +7272,8 @@ ToAvoidLKASFault::ToAvoidLKASFault() : AbstractControl("", "", "") {
     color: #E4E4E4;
     background-color: #393939;
   )");
-  btnminusr.setFixedSize(170, 100);
-  btnplusr.setFixedSize(170, 100);
+  btnminusr.setFixedSize(150, 100);
+  btnplusr.setFixedSize(150, 100);
   hlayout->addWidget(&btnminusr);
   hlayout->addWidget(&btnplusr);
 
@@ -7405,6 +7493,7 @@ UserSpecificFeature::UserSpecificFeature() : AbstractControl(tr("FeatureNumber")
     font-weight: 500;
     height: 120px;
   )");
+  edit.setFixedSize(900, 100);
   btn.setFixedSize(200, 100);
   hlayout->addWidget(&edit);
   hlayout->addWidget(&btn);
@@ -8105,7 +8194,7 @@ void VariableCruiseLevel::refresh() {
   label.setText(QString::fromStdString(params.get("VarCruiseSpeedFactor")));
 }
 
-ExternalDeviceIP::ExternalDeviceIP() : AbstractControl(tr("ExternalDevIP"), tr("Set Your External Device IP to get useful data."), "") {
+ExternalDeviceIP::ExternalDeviceIP() : AbstractControl(tr("ExternalDevIP"), tr("Set Your External Device IP to get useful data. ex. a ip:192.168.0.1 / two or more: 192.168.0.1,192.168.0.2 put comma btw IPs / range:192.168.0.1-10  192.168.0-10.254 use dash(-)"), "") {
   btn.setStyleSheet(R"(
     padding: 0;
     border-radius: 50px;
@@ -8121,6 +8210,7 @@ ExternalDeviceIP::ExternalDeviceIP() : AbstractControl(tr("ExternalDevIP"), tr("
     height: 120px;
   )");
 
+  edit.setFixedSize(1000, 100);
   btn.setFixedSize(150, 100);
   btn.setText(tr("SET"));
   edit.setAlignment(Qt::AlignVCenter|Qt::AlignLeft);
@@ -8130,7 +8220,7 @@ ExternalDeviceIP::ExternalDeviceIP() : AbstractControl(tr("ExternalDevIP"), tr("
 
 
   QObject::connect(&btn, &QPushButton::clicked, [=]() {
-    QString eip_address = InputDialog::getText(tr("Input Your External Dev IP"), this, tr("Seperate with (,) for multiple IP"), false, 1, QString::fromStdString(params.get("ExternalDeviceIP")));
+    QString eip_address = InputDialog::getText(tr("Input Your External Dev IP"), this, tr("See description for more detail how to set up."), false, 1, QString::fromStdString(params.get("ExternalDeviceIP")));
     if (eip_address.length() > 0) {
       params.put("ExternalDeviceIP", eip_address.toStdString());
     }
@@ -8663,6 +8753,7 @@ MapboxToken::MapboxToken() : AbstractControl(tr("MapboxToken"), tr("MapboxToken"
     font-weight: 500;
     height: 120px;
   )");
+  edit.setFixedSize(900, 100);
   btn.setFixedSize(200, 100);
   hlayout->addWidget(&edit);
   hlayout->addWidget(&btn);
