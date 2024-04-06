@@ -45,6 +45,7 @@ EnableLogger = Params().get_bool('KisaEnableLogger')
 EnableUploader = Params().get_bool('KisaEnableUploader')
 EnableOSM = Params().get_bool('OSMEnable') or Params().get_bool('OSMSpeedLimitEnable') or Params().get("CurvDecelOption", encoding="utf8") == "1" or Params().get("CurvDecelOption", encoding="utf8") == "3"
 EnableExternalNavi = Params().get("KISANaviSelect", encoding="utf8") == "1" or Params().get("KISANaviSelect", encoding="utf8") == "2"
+NDM = Params().get_bool('DoNotDisturbMode')
 
 procs = [
   DaemonProcess("manage_athenad", "selfdrive.athena.manage_athenad", "AthenadPid"),
@@ -56,7 +57,7 @@ procs = [
   PythonProcess("micd", "system.micd", iscar),
   PythonProcess("timed", "system.timed", always_run, enabled=not PC),
 
-  PythonProcess("dmonitoringmodeld", "selfdrive.modeld.dmonitoringmodeld", driverview, enabled=(not PC or WEBCAM)),
+  #PythonProcess("dmonitoringmodeld", "selfdrive.modeld.dmonitoringmodeld", driverview, enabled=(not PC or WEBCAM)),
   NativeProcess("encoderd", "system/loggerd", ["./encoderd"], only_onroad),
   NativeProcess("stream_encoderd", "system/loggerd", ["./encoderd", "--stream"], notcar),
   #NativeProcess("loggerd", "system/loggerd", ["./loggerd"], logging),
@@ -70,7 +71,7 @@ procs = [
   PythonProcess("torqued", "selfdrive.locationd.torqued", only_onroad),
   PythonProcess("controlsd", "selfdrive.controls.controlsd", only_onroad),
   #PythonProcess("deleter", "system.loggerd.deleter", always_run),
-  PythonProcess("dmonitoringd", "selfdrive.monitoring.dmonitoringd", driverview, enabled=(not PC or WEBCAM)),
+  #PythonProcess("dmonitoringd", "selfdrive.monitoring.dmonitoringd", driverview, enabled=(not PC or WEBCAM)),
   PythonProcess("qcomgpsd", "system.qcomgpsd.qcomgpsd", qcomgps, enabled=TICI),
   #PythonProcess("ugpsd", "system.ugpsd", only_onroad, enabled=TICI),
   PythonProcess("navd", "selfdrive.navd.navd", only_onroad),
@@ -93,6 +94,12 @@ procs = [
   PythonProcess("webrtcd", "system.webrtc.webrtcd", notcar),
   PythonProcess("webjoystick", "tools.bodyteleop.web", notcar),
 ]
+
+if not NDM:
+  procs += [
+    PythonProcess("dmonitoringmodeld", "selfdrive.modeld.dmonitoringmodeld", driverview, enabled=(not PC or WEBCAM)),
+    PythonProcess("dmonitoringd", "selfdrive.monitoring.dmonitoringd", driverview, enabled=(not PC or WEBCAM)),
+  ]
 
 if EnableLogger:
   procs += [
