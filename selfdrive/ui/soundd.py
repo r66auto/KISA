@@ -39,7 +39,7 @@ sound_list: dict[int, tuple[str, int | None, float]] = {
   AudibleAlert.promptRepeat: ("prompt.wav", 10, MAX_VOLUME),
   AudibleAlert.promptDistracted: ("prompt_distracted.wav", 10, MAX_VOLUME),
 
-  AudibleAlert.warningSoft: ("warning_soft.wav", 10, MAX_VOLUME),
+  AudibleAlert.warningSoft: ("warning_soft.wav", 2, MIN_VOLUME),
   AudibleAlert.warningImmediate: ("warning_immediate.wav", 10, MAX_VOLUME),
   AudibleAlert.warning: ("warning.wav", 1, MAX_VOLUME),
   AudibleAlert.dingdong: ("dingdong.wav", 1, MAX_VOLUME),
