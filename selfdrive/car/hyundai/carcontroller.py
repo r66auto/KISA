@@ -1382,7 +1382,7 @@ class CarController(CarControllerBase):
           if (self.frame - self.last_button_frame) * DT_CTRL >= 0.15:
             self.last_button_frame = self.frame
     else:
-      if (self.frame - self.last_button_frame) * DT_CTRL > 0.25:
+      if (self.frame - self.last_button_frame) * DT_CTRL > 0.20:
         # cruise cancel
         resume = False
         speeds = self.sm['longitudinalPlan'].speeds
@@ -1407,10 +1407,11 @@ class CarController(CarControllerBase):
               can_sends.append(hyundaicanfd.create_buttons(self.packer, self.CP, self.CAN, CS.buttons_counter+1, Buttons.RES_ACCEL))
             self.last_button_frame = self.frame
         elif self.kisa_variablecruise and CS.acc_active:
+          print('acc={}'.format(CS.acc_active))
           btn_signal = self.NC.update(CS)
           self.btnsignal = btn_signal
           if btn_signal is not None:
-            for _ in range(20):
+            for _ in range(25):
               can_sends.append(hyundaicanfd.create_buttons(self.packer, self.CP, self.CAN, CS.buttons_counter+1, btn_signal))
             self.last_button_frame = self.frame
 
