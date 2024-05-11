@@ -1388,28 +1388,25 @@ class CarController(CarControllerBase):
         speeds = self.sm['longitudinalPlan'].speeds
         if len(speeds):
           resume = CS.out.cruiseState.standstill and speeds[-1] > 0.1
-        if CC.cruiseControl.cancel:
-          if self.CP.flags & HyundaiFlags.CANFD_ALT_BUTTONS:
-            can_sends.append(hyundaicanfd.create_acc_cancel(self.packer, self.CP, self.CAN, CS.cruise_info))
-            self.last_button_frame = self.frame
-          else:
-            print('test3')
-            for _ in range(20):
-              can_sends.append(hyundaicanfd.create_buttons(self.packer, self.CP, self.CAN, CS.buttons_counter+1, Buttons.CANCEL))
-            self.last_button_frame = self.frame
+        # if CC.cruiseControl.cancel:
+        #   if self.CP.flags & HyundaiFlags.CANFD_ALT_BUTTONS:
+        #     can_sends.append(hyundaicanfd.create_acc_cancel(self.packer, self.CP, self.CAN, CS.cruise_info))
+        #     self.last_button_frame = self.frame
+        #   else:
+        #     for _ in range(20):
+        #       can_sends.append(hyundaicanfd.create_buttons(self.packer, self.CP, self.CAN, CS.buttons_counter+1, Buttons.CANCEL))
+        #     self.last_button_frame = self.frame
 
         # cruise standstill resume
-        elif resume:
+        if resume:
           if self.CP.flags & HyundaiFlags.CANFD_ALT_BUTTONS:
             # TODO: resume for alt button cars
             pass
           else:
-            print('test2')
-            for _ in range(20):
+            for _ in range(25):
               can_sends.append(hyundaicanfd.create_buttons(self.packer, self.CP, self.CAN, CS.buttons_counter+1, Buttons.RES_ACCEL))
             self.last_button_frame = self.frame
         elif self.kisa_variablecruise and CS.acc_active:
-          print('acc={}'.format(CS.acc_active))
           btn_signal = self.NC.update(CS)
           self.btnsignal = btn_signal
           if btn_signal is not None:
