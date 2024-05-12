@@ -1406,7 +1406,8 @@ class CarController(CarControllerBase):
             for _ in range(20):
               can_sends.append(hyundaicanfd.create_buttons(self.packer, self.CP, self.CAN, CS.buttons_counter+1, Buttons.RES_ACCEL))
             self.last_button_frame = self.frame
-        elif self.kisa_variablecruise and CS.acc_active:
+        else:
+          print('test')
           btn_signal = self.NC.update(CS)
           self.btnsignal = btn_signal
           if btn_signal is not None:
