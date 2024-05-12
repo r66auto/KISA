@@ -1411,7 +1411,7 @@ class CarController(CarControllerBase):
               can_sends.append(hyundaicanfd.create_buttons(self.packer, self.CP, self.CAN, CS.buttons_counter+1, Buttons.RES_ACCEL, CS.cruise_btn_info))
             self.last_button_frame = self.frame
             self.resume_running = False
-      if (self.frame - self.last_button_frame) * DT_CTRL > (randint(1, 2) * 0.1) and not self.resume_running:
+      if (self.frame - self.last_button_frame) * DT_CTRL > (randint(1, 2) * 1) and not self.resume_running:
         if self.kisa_variablecruise and CS.acc_active:
           btn_signal = self.NC.update(CS)
           self.btnsignal = btn_signal
