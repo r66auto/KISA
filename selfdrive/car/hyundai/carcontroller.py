@@ -1382,7 +1382,7 @@ class CarController(CarControllerBase):
           if (self.frame - self.last_button_frame) * DT_CTRL >= 0.15:
             self.last_button_frame = self.frame
     else:
-      if (self.frame - self.last_button_frame) * DT_CTRL > 0.1:
+      if (self.frame - self.last_button_frame) * DT_CTRL > 0.20:
         # cruise cancel
         resume = False
         speeds = self.sm['longitudinalPlan'].speeds
@@ -1393,7 +1393,6 @@ class CarController(CarControllerBase):
             can_sends.append(hyundaicanfd.create_acc_cancel(self.packer, self.CP, self.CAN, CS.cruise_info))
             self.last_button_frame = self.frame
           else:
-            print('test3')
             for _ in range(20):
               can_sends.append(hyundaicanfd.create_buttons(self.packer, self.CP, self.CAN, CS.buttons_counter+1, Buttons.CANCEL))
             self.last_button_frame = self.frame
@@ -1404,7 +1403,6 @@ class CarController(CarControllerBase):
             # TODO: resume for alt button cars
             pass
           else:
-            print('test2')
             for _ in range(20):
               can_sends.append(hyundaicanfd.create_buttons(self.packer, self.CP, self.CAN, CS.buttons_counter+1, Buttons.RES_ACCEL))
             self.last_button_frame = self.frame
