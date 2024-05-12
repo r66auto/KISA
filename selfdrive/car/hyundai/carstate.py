@@ -697,7 +697,6 @@ class CarState(CarStateBase):
       self.cruise_info = copy.copy(cp_cruise_info.vl["SCC_CONTROL"])
 
       self.acc_active = cp_cruise_info.vl["SCC_CONTROL"]["ACCMode"] in (1, 2)
-      print('self.acc={}'.format(self.acc_active))
       ret.cruiseState.accActive = self.acc_active
       if self.acc_active:
         self.brake_check = False
