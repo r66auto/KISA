@@ -347,7 +347,7 @@ def navi_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, met
     tr(193) if IS_WAZE else tr(95),
     "",
     AlertStatus.normal, AlertSize.small,
-    Priority.MID, VisualAlert.none, AudibleAlert.warningSoft, 1.)
+    Priority.MID, VisualAlert.none, AudibleAlert.wazeAlert, 1.)
 
 
 
