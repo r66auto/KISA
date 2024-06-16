@@ -11,7 +11,7 @@ from panda import ALTERNATIVE_EXPERIENCE
 from openpilot.common.params import Params
 from openpilot.common.realtime import config_realtime_process, Priority, Ratekeeper, DT_CTRL
 
-from openpilot.selfdrive.boardd.boardd import can_list_to_can_capnp
+from openpilot.selfdrive.pandad import can_list_to_can_capnp
 from openpilot.selfdrive.car.car_helpers import get_car, get_one_can
 from openpilot.selfdrive.car.interfaces import CarInterfaceBase
 from openpilot.selfdrive.controls.lib.events import Events
@@ -29,8 +29,7 @@ class Car:
     self.sm = messaging.SubMaster(['pandaStates', 'carControl', 'onroadEvents'])
     self.pm = messaging.PubMaster(['sendcan', 'carState', 'carParams', 'carOutput'])
 
-    self.can_rcv_timeout_counter = 0  # consecutive timeout count
-    self.can_rcv_cum_timeout_counter = 0  # cumulative timeout count
+    self.can_rcv_cum_timeout_counter = 0
 
     self.CC_prev = car.CarControl.new_message()
     self.CS_prev = car.CarState.new_message()
@@ -38,7 +37,7 @@ class Car:
 
     self.last_actuators_output = car.CarControl.Actuators.new_message()
 
-    params = Params()
+    self.params = Params()
 
     if CI is None:
       # wait for one pandaState and one CAN packet
@@ -46,18 +45,18 @@ class Car:
       get_one_can(self.can_sock)
 
       num_pandas = len(messaging.recv_one_retry(self.sm.sock['pandaStates']).pandaStates)
-      experimental_long_allowed = params.get_bool("ExperimentalLongitudinalEnabled")
+      experimental_long_allowed = self.params.get_bool("ExperimentalLongitudinalEnabled")
       self.CI, self.CP = get_car(self.can_sock, self.pm.sock['sendcan'], experimental_long_allowed, num_pandas)
     else:
       self.CI, self.CP = CI, CI.CP
 
     # set alternative experiences from parameters
-    self.disengage_on_accelerator = params.get_bool("DisengageOnAccelerator")
+    self.disengage_on_accelerator = self.params.get_bool("DisengageOnAccelerator")
     self.CP.alternativeExperience = 0
     if not self.disengage_on_accelerator:
       self.CP.alternativeExperience |= ALTERNATIVE_EXPERIENCE.DISABLE_DISENGAGE_ON_GAS
 
-    openpilot_enabled_toggle = params.get_bool("OpenpilotEnabledToggle")
+    openpilot_enabled_toggle = self.params.get_bool("OpenpilotEnabledToggle")
 
     controller_available = self.CI.CC is not None and openpilot_enabled_toggle and not self.CP.dashcamOnly
 
@@ -68,17 +67,17 @@ class Car:
       self.CP.safetyConfigs = [safety_config]
 
     # Write previous route's CarParams
-    prev_cp = params.get("CarParamsPersistent")
+    prev_cp = self.params.get("CarParamsPersistent")
     if prev_cp is not None:
-      params.put("CarParamsPrevRoute", prev_cp)
+      self.params.put("CarParamsPrevRoute", prev_cp)
 
     # Write CarParams for controls and radard
     cp_bytes = self.CP.to_bytes()
-    params.put("CarParams", cp_bytes)
-    params.put_nonblocking("CarParamsCache", cp_bytes)
-    params.put_nonblocking("CarParamsPersistent", cp_bytes)
+    self.params.put("CarParams", cp_bytes)
+    self.params.put_nonblocking("CarParamsCache", cp_bytes)
+    self.params.put_nonblocking("CarParamsPersistent", cp_bytes)
 
-    self.ufc_mode = params.get_bool("UFCModeEnabled")
+    self.ufc_mode = self.params.get_bool("UFCModeEnabled")
 
     self.events = Events()
 
@@ -98,12 +97,7 @@ class Car:
 
     # Check for CAN timeout
     if not can_rcv_valid:
-      self.can_rcv_timeout_counter += 1
       self.can_rcv_cum_timeout_counter += 1
-    else:
-      self.can_rcv_timeout_counter = 0
-
-    self.can_rcv_timeout = self.can_rcv_timeout_counter >= 5
 
     if can_rcv_valid and REPLAY:
       self.can_log_mono_time = messaging.log_from_bytes(can_strs[0]).logMonoTime
@@ -144,7 +138,6 @@ class Car:
     cs_send = messaging.new_message('carState')
     cs_send.valid = CS.canValid
     cs_send.carState = CS
-    cs_send.carState.canRcvTimeout = self.can_rcv_timeout
     cs_send.carState.canErrorCounter = self.can_rcv_cum_timeout_counter
     cs_send.carState.cumLagMs = -self.rk.remaining * 1000.
     self.pm.send('carState', cs_send)
@@ -154,7 +147,10 @@ class Car:
 
     if not self.initialized_prev:
       # Initialize CarInterface, once controls are ready
+      # TODO: this can make us miss at least a few cycles when doing an ECU knockout
       self.CI.init(self.CP, self.can_sock, self.pm.sock['sendcan'])
+      # signal pandad to switch to car safety mode
+      self.params.put_bool_nonblocking("ControlsReady", True)
 
     if self.sm.all_alive(['carControl']):
       # send car controls over can
