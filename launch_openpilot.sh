@@ -1,5 +1,6 @@
 #!/usr/bin/bash
-
+export ATHENA_HOST="wss://connect-ws.duckdns.org"
+export API_HOST="https://connect-api.duckdns.org"
 # prebuilt recreate
 if [ -f "/data/kisa_compiling" ]; then
     sudo rm /data/kisa_compiling
