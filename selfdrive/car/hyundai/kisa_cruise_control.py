@@ -467,12 +467,12 @@ class KisaCruiseControl():
           self.t_interval = randint(self.t_interval2+3, self.t_interval2+5) if CS.is_set_speed_in_mph else randint(self.t_interval2, self.t_interval2+2)
           self.cut_in_run_timer = 0
           self.cutInControl = False
-      elif self.lead_0.status and CS.CP.vFuture < min_control_speed and CS.cruise_set_mode in (1,2,4):
+      elif self.lead_0.status and CS.CP.vFuture < min_control_speed and CS.cruise_set_mode in (1,2,3):
         self.faststart = False
         var_speed = min(CS.CP.vFuture, navi_speed)
         self.t_interval = randint(self.t_interval2+3, self.t_interval2+5) if CS.is_set_speed_in_mph else randint(self.t_interval2, self.t_interval2+2)
         self.cutInControl = False
-      elif CS.cruise_set_mode == 3:
+      elif CS.cruise_set_mode == 4:
         self.faststart = False
         var_speed = navi_speed
         self.t_interval = randint(self.t_interval2+3, self.t_interval2+5) if CS.is_set_speed_in_mph else randint(self.t_interval2, self.t_interval2+2)
