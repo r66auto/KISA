@@ -356,9 +356,9 @@ class CarController(CarControllerBase):
     if self.joystick_debug_mode:
       lat_active = CC.latActive
     # disable when temp fault is active, or below LKA minimum speed
-    elif self.kisa_maxanglelimit == 90:
+    elif self.kisa_maxanglelimit == 180:
       lat_active = CC.latActive and abs(CS.out.steeringAngleDeg) < self.kisa_maxanglelimit and (CS.out.gearShifter == GearShifter.drive or self.user_specific_feature == 11)
-    elif self.kisa_maxanglelimit > 90:
+    elif self.kisa_maxanglelimit > 180:
       str_angle_limit = interp(CS.out.vEgo * CV.MS_TO_KPH, [0, 20], [self.kisa_maxanglelimit+60, self.kisa_maxanglelimit])
       lat_active = CC.latActive and abs(CS.out.steeringAngleDeg) < str_angle_limit and (CS.out.gearShifter == GearShifter.drive or self.user_specific_feature == 11)
     else:
@@ -393,7 +393,7 @@ class CarController(CarControllerBase):
       # CS.out.steeringPressed and steeringTorque are based on the
       # STEERING_COL_TORQUE value
 
-      lkas_max_torque = 180
+      lkas_max_torque = 200
       if abs(CS.out.steeringTorque) > 200:
         self.driver_steering_angle_above_timer -= 1
         if self.driver_steering_angle_above_timer <= 30:
